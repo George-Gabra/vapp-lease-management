@@ -279,7 +279,7 @@ def export_vapps():
 
     si = StringIO()
     writer = csv.writer(si)
-    writer.writerow(["vAPP Name", "Geo", "Tenant", "Template", "Wolken Ticket ID", "Expires On"])
+    writer.writerow(["vAPP Name", "Geo", "Tenant", "Template", "Request ID", "Expires On"])
 
     for vapp in vapps:
         writer.writerow([
@@ -293,7 +293,7 @@ def export_vapps():
 
     geo_part = geo.upper() if geo else "ALL"
     date_part = datetime.today().strftime("%Y%m%d")
-    filename = f"GCP_Lease_vAPPs_{geo_part}_{date_part}.csv"
+    filename = f"List_Lease_vAPPs_{geo_part}_{date_part}.csv"
 
     output = make_response(si.getvalue())
     output.headers["Content-Disposition"] = f"attachment; filename={filename}"
