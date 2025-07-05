@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAPP Lease Management</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='App-icon.png') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+            background-color: #f4f7f9;
+            color: #333;
+        }
+
+        h1, h2 {
+            color: #2c3e50;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        label {
+            display: inline-block;
+            width: 150px;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        select {
+            width: 200px;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 10px;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const geoSelect = document.getElementById("geo");
+            const tenantSelect = document.getElementById("tenant");
+            const queryGeoSelect = document.getElementById("query-geo");
+            const queryTenantSelect = document.getElementById("query-tenant");
+
+            const tenantOptions = {
+                AMER: ["OpsTeam", "Resilience", "DevTools"],
+                APJ: ["Marketplace", "CoreInfra", "CloudOps"],
+                EMEA: ["Marketplace", "PlatformOps", "InnovationHub", "MissionControl"]
+            };
+
+            function updateTenantOptions(selectElement, selectedGeo) {
+                selectElement.innerHTML = "<option value=''>Select Tenant</option>";
+                if (tenantOptions[selectedGeo]) {
+                    tenantOptions[selectedGeo].forEach(tenant => {
+                        const option = document.createElement("option");
+                        option.value = tenant;
+                        option.textContent = tenant;
+                        selectElement.appendChild(option);
+                    });
+                }
+            }
+
+            if (geoSelect) {
+                geoSelect.addEventListener("change", () => {
+                    updateTenantOptions(tenantSelect, geoSelect.value);
+                });
+            }
+
+            if (queryGeoSelect) {
+                queryGeoSelect.addEventListener("change", () => {
+                    updateTenantOptions(queryTenantSelect, queryGeoSelect.value);
+                });
+            }
+
+            queryVApps();
+        });
+
+        function formatDateToBackend(dateStr) {
+            const parts = dateStr.split("-");
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        function formatDateToFrontend(dateStr) {
+            const parts = dateStr.split("-");
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        function addVApp() {
+            const geo = document.getElementById("geo").value;
+            const vappName = document.getElementById("vapp-name").value;
+            const tenant = document.getElementById("tenant").value;
+            const expiresOn = document.getElementById("expires-on").value;
+            const template = document.getElementById("template").value;
+            const formattedExpiresOn = formatDateToBackend(expiresOn);
+            const ticketID = document.getElementById("ticket-id").value;
+
+            fetch('/api/add-vapp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vappName, geo, tenant, expiresOn: formattedExpiresOn, template, ticketID })
+            })
+            .then(response => response.json())
+            .then(() => {
+                alert("vAPP added successfully!");
+                queryVApps();
+            })
+            .catch(error => {
+                alert("Failed to add vAPP: " + error);
+            });
+        }
+
+        function queryVApps() 
+        {
+            const geo = document.getElementById("query-geo").value;
+            const tenant = document.getElementById("query-tenant").value;
+
+            const url = new URL("/api/query-vapp", window.location.origin);
+            if (geo) url.searchParams.append("geo", geo);
+            if (tenant) url.searchParams.append("tenant", tenant);
+
+            fetch(url)
+                .then(response => {
+                if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
+                throw new Error("Not authenticated or bad response");
+                }
+                return response.json();
+                })
+                .then(data => {
+                if (!Array.isArray(data)) {
+                throw new Error("Unexpected response format");
+                }
+            const resultsTable = document.getElementById("query-results");
+            resultsTable.innerHTML = '';
+            data.forEach(record => {
+                const formattedDate = formatDateToFrontend(record.expiresOn);
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${record.vappName}</td>
+                    <td>${record.geo}</td>
+                    <td>${record.tenant}</td>
+                    <td>${record.template}</td>
+                    <td>${record.ticketID}</td>
+                    <td><input type="date" id="expires-on-${record.id}" value="${formattedDate}"></td>
+                    <td>
+                        <button onclick="updateLease(${record.id})">Update Lease</button>
+                       <button onclick="deleteVApp(${record.id}, '${record.vappName.replace(/'/g, "\\'")}')">Delete</button>
+                    </td>
+                `;
+                resultsTable.appendChild(row);
+            });
+        })
+        .catch(error => {
+            alert("Error retrieving vAPPs: " + error.message);
+        });
+        }
+
+        function updateLease(id) {
+            const newExpiresOn = document.getElementById(`expires-on-${id}`).value;
+            const formattedExpiresOn = formatDateToBackend(newExpiresOn);
+
+            fetch(`/api/update-lease/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ expiresOn: formattedExpiresOn })
+            })
+            .then(response => response.json())
+            .then(() => {
+                alert("Lease updated successfully!");
+                queryVApps();
+            })
+            .catch(error => {
+                alert("Failed to update lease: " + error);
+            });
+        }
+
+
+        function exportVApps() {
+            const geo = document.getElementById("query-geo").value;
+            const tenant = document.getElementById("query-tenant").value;
+
+            const url = new URL("/api/export-vapps", window.location.origin);
+            if (geo) url.searchParams.append("geo", geo);
+            if (tenant) url.searchParams.append("tenant", tenant);
+
+            const a = document.createElement("a");
+            a.href = url.toString();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+
+        function deleteVApp(id, name) {
+            if (!confirm(`Are you sure you want to delete the vAPP "${name}"?`)) return;
+            fetch(`/api/delete-vapp/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(() => {
+                    alert(`vAPP "${name}" has been deleted successfully!`);
+                    queryVApps();
+                })
+                .catch(error => {
+                    alert(`Failed to delete vAPP "${name}": ` + error);
+                });
+        }
+    </script>
+</head>
+<body>
+    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 30px;">
+        <img src="{{ url_for('static', filename='App-icon.png') }}" alt="App Icon" style="height: 1.5em; margin-right: 10px;">
+        <h1 style="margin: 0;">vAPP Lease Management</h1>
+    </div>
+    <div style="text-align: right; margin-bottom: 20px;">
+        <a href="{{ url_for('user_management') }}" style="font-weight: bold; color: #2c3e50;">Manage Users</a>
+        <a href="{{ url_for('logout') }}" style="font-weight: bold; color: #e74c3c; margin-right: 15px;">Logout</a>
+    </div>
+    <h2>Add New vAPP</h2>
+    <form onsubmit="addVApp(); return false;">
+        <label for="geo">Geo:</label>
+        <select id="geo" required>
+            <option value="">Select Geo</option>
+            <option value="AMER">AMER</option>
+            <option value="APJ">APJ</option>
+            <option value="EMEA">EMEA</option>
+        </select><br>
+
+        <label for="vapp-name">vAPP Name:</label>
+        <input type="text" id="vapp-name" required><br>
+
+        <label for="tenant">Tenant:</label>
+        <select id="tenant" required>
+            <option value="">Select Tenant</option>
+        </select><br>
+
+        <label for="expires-on">Expires On:</label>
+        <input type="date" id="expires-on" required><br>
+
+        <label for="template">Template:</label>
+        <select id="template">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+        </select><br>
+
+        <label for="ticket-id">Request ID:</label>
+        <input type="text" id="ticket-id" required><br>
+
+        <button type="submit">Add vAPP</button>
+    </form>
+
+    <h2>Filter vAPPs</h2>
+    <form onsubmit="queryVApps(); return false;">
+        <label for="query-geo">Geo:</label>
+        <select id="query-geo">
+            <option value="">Select Geo</option>
+            <option value="AMER">AMER</option>
+            <option value="APJ">APJ</option>
+            <option value="EMEA">EMEA</option>
+        </select><br>
+
+        <label for="query-tenant">Tenant:</label>
+        <select id="query-tenant">
+            <option value="">Select Tenant</option>
+        </select><br>
+
+        <button type="submit">Filter</button>
+        <button type="button" onclick="exportVApps()">Export to CSV</button>
+    </form>
+
+    <h2>vAPPs List</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>vAPP Name</th>
+                <th>Geo</th>
+                <th>Tenant</th>
+                <th>Template</th>
+                <th>Request ID</th>
+                <th>Expires On</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="query-results">
+        </tbody>
+    </table>
+</body>
+</html>

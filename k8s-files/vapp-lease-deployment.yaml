@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vapp-lease-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vapp
+  template:
+    metadata:
+      labels:
+        app: vapp
+    spec:
+      containers:
+        - name: vapp-lease-container
+          image: <Image-ID>
+          ports:
+            - containerPort: 5000
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: vapp-db-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vapp-db-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: vapp-db-secret
+                  key: POSTGRES_DB
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: vapp-db-secret
+                  key: POSTGRES_HOST

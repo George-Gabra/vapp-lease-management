@@ -1,0 +1,9 @@
+flask
+flask_sqlalchemy
+psycopg2-binary
+gunicorn
+flask-migrate
+flask-cors
+apscheduler
+flask-login
+flask-wtf
